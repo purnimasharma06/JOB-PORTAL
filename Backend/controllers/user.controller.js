@@ -413,70 +413,118 @@ export const logout = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    console.log('Uploaded file:', req.file);
-    console.log('Request body:', req.body);
+    console.log("Uploaded file:", req.file);
+    console.log("Request body:", req.body);
 
-    const { fullname, email, phoneNumber, bio, skills, resume } = req.body;  
+    const { fullname, email, phoneNumber, bio, skills, resume } = req.body;
     const file = req.file;
 
-    // Check if file is uploaded
-    
+    const userId = req.id;
 
-    //cloudinary upload if file exists
-    let cloudResponse;
-    if (file) {
-      const fileUri = getDataUri(file);
-      cloudResponse = await cloudinary.uploader.upload(fileUri.content);
-    }
-    
-
-    // Initialize userId at the beginning
-    const userId = req.id; // middleware authentication
-
-    // Check if userId is valid
+    // Find user
     let user = await User.findById(userId);
+
     if (!user) {
       return res.status(404).json({
-        message: "User  not found",
+        message: "User not found",
         success: false,
       });
     }
 
-    // Process skills if provided
-    let skillsArray;
-    if (skills) {
-      skillsArray = skills.split(",");
+    // Convert skills string into array
+    let skillsArray = [];
+
+    if (skills && skills.trim() !== "") {
+      skillsArray = skills
+        .split(",")
+        .map((skill) => skill.trim())
+        .filter((skill) => skill !== "");
     }
 
-    // Update user profile
+    /*
+      STUDENT VALIDATION
+
+      Skills and resume are mandatory for students.
+
+      We check:
+      - New skills from request OR existing skills in profile
+      - New resume from request OR existing resume in profile
+    */
+
+    if (user.role === "student") {
+      const finalSkills =
+        skillsArray.length > 0
+          ? skillsArray
+          : user.profile?.skills || [];
+
+      const finalResume =
+        resume && resume.trim() !== ""
+          ? resume
+          : user.profile?.resume;
+
+      if (finalSkills.length === 0) {
+        return res.status(400).json({
+          message: "Skills are required for students",
+          success: false,
+        });
+      }
+
+      if (!finalResume || finalResume.trim() === "") {
+        return res.status(400).json({
+          message: "Resume is required for students",
+          success: false,
+        });
+      }
+    }
+
+    // Update basic user information
     if (fullname) {
       user.fullname = fullname;
     }
+
     if (email) {
       user.email = email;
     }
+
     if (phoneNumber) {
       user.phoneNumber = phoneNumber;
     }
+
+    // Make sure profile exists
+    if (!user.profile) {
+      user.profile = {};
+    }
+
+    // Update bio
     if (bio) {
       user.profile.bio = bio;
     }
-    if (skills) {
+
+    // Update skills
+    if (skills && skills.trim() !== "") {
       user.profile.skills = skillsArray;
     }
-    if (resume) {
+
+    // Update resume
+    if (resume && resume.trim() !== "") {
       user.profile.resume = resume;
     }
-    
-    //profile photo
-    if (cloudResponse) {
+
+    // Upload profile photo if file exists
+    if (file) {
+      const fileUri = getDataUri(file);
+
+      const cloudResponse = await cloudinary.uploader.upload(
+        fileUri.content
+      );
+
       user.profile.profilePhoto = cloudResponse.secure_url;
     }
 
     // Save updated user
     await user.save();
 
-    user = {
+    const updatedUser = {
       _id: user._id,
       fullname: user.fullname,
       email: user.email,
@@ -487,12 +535,14 @@ export const updateProfile = async (req, res) => {
 
     return res.status(200).json({
       message: "Profile updated successfully",
-      user,
+      user: updatedUser,
       success: true,
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+
+    return res.status(500).json({
       message: "Server Error updating profile",
       success: false,
     });
