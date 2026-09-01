@@ -30,6 +30,12 @@ app.use(
 
 const PORT = process.env.PORT || 8000;
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "Backend is running successfully",
+  });
+});
+
 // API routes
 app.use("/api/user", userRoute);
 app.use("/api/company", companyRoute);
@@ -48,6 +54,7 @@ if (process.env.NODE_ENV === "production") {
     );
   });
 }
+
 
 app.listen(PORT, () => {
   connectDB();
