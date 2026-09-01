@@ -9,8 +9,6 @@ import companyRoute from "./routes/company.route.js";
 import jobRoute from "./routes/job.route.js";
 import applicationRoute from "./routes/application.route.js";
 
-import path from "path";
-
 dotenv.config();
 
 const app = express();
@@ -28,8 +26,7 @@ app.use(
   })
 );
 
-const PORT = process.env.PORT || 8000;
-
+// Check backend
 app.get("/", (req, res) => {
   res.json({
     message: "Backend is running successfully",
@@ -42,21 +39,11 @@ app.use("/api/company", companyRoute);
 app.use("/api/job", jobRoute);
 app.use("/api/application", applicationRoute);
 
-// Deployment
-if (process.env.NODE_ENV === "production") {
-  const dirpath = path.resolve();
+// Connect database
+connectDB();
 
-  app.use(express.static("./Frontend/dist"));
-
-  app.get("*", (req, res) => {
-    res.sendFile(
-      path.resolve(dirpath, "./Frontend/dist", "index.html")
-    );
-  });
-}
-
+const PORT = process.env.PORT || 8000;
 
 app.listen(PORT, () => {
-  connectDB();
   console.log(`Server is running on port ${PORT}`);
 });
